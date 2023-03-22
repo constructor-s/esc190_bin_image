@@ -1,0 +1,158 @@
+<!-- Reference: https://developer.mozilla.org/en-US/docs/Web/API/HTML_Drag_and_Drop_API/File_drag_and_drop -->
+<!-- And thanks to co-pilot... -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Display ESC190 *.bin image</title>
+    
+    <style>
+        #drop_zone {
+            border: 5px solid blue;
+            width: 200px;
+            height: 100px;
+        }
+    </style>
+</head>
+
+<body>
+    <div
+        id="drop_zone"
+        ondrop="dropHandler(event);"
+        ondragover="dragOverHandler(event);">
+        <p>Drag an image file (*.jpg, *.png, *.bmp) or binary (*.bin) file <i>here</i>.</p>
+    </div>
+
+    <p id="description"></p>
+
+    <p><canvas id="canvas"></canvas></p>
+
+    <p><button id="download_bin" onclick="download_canvas_as_bin(event);">Save as image.bin file</button></p>
+
+    <p>To save as a PNG file, right click on the image above and select <em>Save Image As...</em></p>
+
+<script>
+    function dropHandler(ev) {
+        console.log("File(s) dropped");
+        
+        // Prevent default behavior (Prevent file from being opened)
+        ev.preventDefault();
+        
+        if (ev.dataTransfer.items) {
+            // Use DataTransferItemList interface to access the file(s)
+            [...ev.dataTransfer.items].forEach((item, i) => {
+                // If dropped items aren't files, reject them
+                if (item.kind === "file") {
+                    const file = item.getAsFile();
+                    console.log(`… file[${i}].name = ${file.name}`);
+                    
+                    if (file.name.endsWith(".bin")) {
+                        displayBinFile(file);
+                    } else {
+                        displayImageFile(file);
+                    }
+                }
+            });
+        } else {
+            // Use DataTransfer interface to access the file(s)
+            [...ev.dataTransfer.files].forEach((file, i) => {
+                console.log(`… file[${i}].name = ${file.name}`);
+
+                if (file.name.endsWith(".bin")) {
+                    displayBinFile(file);
+                } else {
+                    displayImageFile(file);
+                }
+            });
+        }
+    }
+
+    function displayBinFile(file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const buffer = new Uint8Array(e.target.result);
+            const height = buffer[0] * 256 + buffer[1];
+            const width = buffer[2] * 256 + buffer[3];
+            const raster = buffer.slice(4);
+
+            // Add additional alpha channel to the raster
+            const arr = new Uint8ClampedArray(height * width * 4);
+            for (let i = 0; i < height * width * 3; i += 3) {
+                arr[Math.floor(i/3)*4 + 0] = raster[i + 0]; // R value
+                arr[Math.floor(i/3)*4 + 1] = raster[i + 1]; // G value
+                arr[Math.floor(i/3)*4 + 2] = raster[i + 2]; // B value
+                arr[Math.floor(i/3)*4 + 3] = 255; // A value
+            }
+            
+            document.getElementById("description").innerHTML = `Image size: ${width} x ${height}`;
+
+            const canvas = document.getElementById("canvas");
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext("2d");
+            const imageData = new ImageData(arr, width, height);
+            ctx.putImageData(imageData, 0, 0);
+            
+        };
+        reader.readAsArrayBuffer(file);
+    }
+
+    function displayImageFile(file) {
+        // Display the image file in the canvas with id "canvas"
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const img = new Image();
+            img.onload = function() {
+                const canvas = document.getElementById("canvas");
+                canvas.width = img.width;
+                canvas.height = img.height;
+                document.getElementById("description").innerHTML = `Image size: ${img.width} x ${img.height}`;
+                const ctx = canvas.getContext("2d");
+                ctx.drawImage(img, 0, 0);
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function download_canvas_as_bin(ev) {
+        // Convert the canvas to a binary file
+        const canvas = document.getElementById("canvas");
+        const ctx = canvas.getContext("2d");
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const raster = imageData.data;
+        const height = canvas.height;
+        const width = canvas.width;
+        const buffer = new Uint8Array(4 + height * width * 3);
+        buffer[0] = Math.floor(height / 256);
+        buffer[1] = height % 256;
+        buffer[2] = Math.floor(width / 256);
+        buffer[3] = width % 256;
+        for (let i = 0; i < height * width * 3; i += 3) {
+            buffer[4 + i + 0] = raster[Math.floor(i/3)*4 + 0]; // R value
+            buffer[4 + i + 1] = raster[Math.floor(i/3)*4 + 1]; // G value
+            buffer[4 + i + 2] = raster[Math.floor(i/3)*4 + 2]; // B value
+        }
+
+        console.log(buffer);
+        
+        // Create a link to download the buffer
+        const link = document.createElement("a");
+        link.download = "image.bin";
+        link.href = URL.createObjectURL(new Blob([buffer], {type: "application/octet-stream"}));
+        link.click();
+    }
+
+    function dragOverHandler(ev) {
+        console.log("File(s) in drop zone");
+        
+        // Prevent default behavior (Prevent file from being opened)
+        ev.preventDefault();
+    }
+
+</script>
+</body>
+</html>
