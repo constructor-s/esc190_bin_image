@@ -12,8 +12,17 @@
     <style>
         #drop_zone {
             border: 5px solid blue;
-            width: 200px;
-            height: 100px;
+            /* make it the same width as the page */
+            width: 100%;
+            height: 200px;
+        }
+
+        /* make the canvas upscale image using nearest neighbour 
+           and at least 100px while keeping aspect ratio */
+        #canvas {
+            image-rendering: pixelated;
+            min-width: 100px;
+            object-fit: contain;
         }
     </style>
 </head>
@@ -136,8 +145,6 @@
             buffer[4 + i + 1] = raster[Math.floor(i/3)*4 + 1]; // G value
             buffer[4 + i + 2] = raster[Math.floor(i/3)*4 + 2]; // B value
         }
-
-        console.log(buffer);
         
         // Create a link to download the buffer
         const link = document.createElement("a");
